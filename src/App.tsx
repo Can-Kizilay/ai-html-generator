@@ -26,8 +26,8 @@ function App() {
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [theme, setTheme] = useState("light");
-  const [layout, setLayout] = useState<"horizontal" | "vertical">("horizontal");
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [layout, setLayout] = useState<"horizontal" | "vertical">(() => localStorage.getItem('layout') as "horizontal" | "vertical" || 'horizontal');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isInputVisible, setIsInputVisible] = useState(true);
   const lastScrollTop = useRef(0);
@@ -216,7 +216,12 @@ function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('layout', layout);
+  }, [layout]);
 
   const handleScroll = (event: React.UIEvent<HTMLElement>) => {
     const { scrollTop } = event.currentTarget;
@@ -480,11 +485,27 @@ function App() {
           </div>
           <div className="history-dropdown" ref={historyDropdownRef}>
             <button
-              className="dropdown-button"
+              className="dropdown-button icon-button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               disabled={savedComponents.length === 0}
+              aria-label="History"
             >
-              History
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 3v5a2 2 0 0 0 2 2h5"></path>
+                <path d="M3 12v5a2 2 0 0 0 2 2h5"></path>
+                <path d="M12 3v5a2 2 0 0 0 2 2h5"></path>
+                <path d="M12 12v5a2 2 0 0 0 2 2h5"></path>
+              </svg>
             </button>
             {isDropdownOpen && savedComponents.length > 0 && (
               <div className="dropdown-content">
@@ -514,11 +535,26 @@ function App() {
           </div>
           <div className="share-dropdown" ref={shareDropdownRef}>
             <button
-              className="dropdown-button"
+              className="dropdown-button icon-button"
               onClick={() => setIsShareDropdownOpen(!isShareDropdownOpen)}
               disabled={!combinedHtml}
+              aria-label="Share"
             >
-              Share
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                <polyline points="16 6 12 2 8 6"></polyline>
+                <line x1="12" y1="2" x2="12" y2="15"></line>
+              </svg>
             </button>
             {isShareDropdownOpen && (
               <div className="dropdown-content">
