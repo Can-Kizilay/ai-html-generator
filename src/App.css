@@ -385,6 +385,11 @@ input:checked + .slider:before {
   display: inline-block;
 }
 
+.share-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
 .dropdown-button {
   background-color: var(--button-background);
   color: var(--button-text-color);

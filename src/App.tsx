@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import Toaster from "./Toaster";
+import { v4 as uuidv4 } from 'uuid';
 import "./App.css";
 import HtmlRenderer from "./HtmlRenderer";
 import { GoogleGenAI } from "@google/genai";
@@ -33,9 +35,47 @@ function App() {
   const [savedComponents, setSavedComponents] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const [toastMessages, setToastMessages] = useState<any[]>([]);
+
+  const historyDropdownRef = useRef<HTMLDivElement>(null);
+  const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = uuidv4();
+    setToastMessages((prevMessages) => [...prevMessages, { id, message, type }]);
+    setTimeout(() => {
+      removeToast(id);
+    }, 3000); // Toast disappears after 3 seconds
+  };
+
+  const removeToast = (id: string) => {
+    setToastMessages((prevMessages) =>
+      prevMessages.filter((msg) => msg.id !== id)
+    );
+  };
 
   useEffect(() => {
     loadSavedComponents();
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        historyDropdownRef.current &&
+        !historyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+      if (
+        shareDropdownRef.current &&
+        !shareDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsShareDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   const loadSavedComponents = () => {
@@ -73,6 +113,87 @@ function App() {
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
+  };
+
+  const handleShareAsGist = async () => {
+    if (!generatedHtml && !generatedCss && !generatedJs) {
+      showToast("No content to share.", 'info');
+      return;
+    }
+
+    const gistContent = {
+      description: description || "Generated HTML Component",
+      public: true,
+      files: {
+        "index.html": {
+          content: generatedHtml,
+        },
+        "style.css": {
+          content: generatedCss,
+        },
+        "script.js": {
+          content: generatedJs,
+        },
+      },
+    };
+
+    try {
+      const files: { [key: string]: { content: string } } = {};
+      if (generatedHtml) {
+        files["index.html"] = { content: generatedHtml };
+      }
+      if (generatedCss) {
+        files["style.css"] = { content: generatedCss };
+      }
+      if (generatedJs) {
+        files["script.js"] = { content: generatedJs };
+      }
+
+      const form = document.createElement("form");
+      form.setAttribute("method", "POST");
+      form.setAttribute("action", "https://gist.github.com/");
+      form.setAttribute("target", "_blank");
+
+      const descriptionInput = document.createElement("input");
+      descriptionInput.setAttribute("type", "hidden");
+      descriptionInput.setAttribute("name", "description");
+      descriptionInput.setAttribute("value", description || "Generated HTML Component");
+      form.appendChild(descriptionInput);
+
+      const publicInput = document.createElement("input");
+      publicInput.setAttribute("type", "hidden");
+      publicInput.setAttribute("name", "public");
+      publicInput.setAttribute("value", "true");
+      form.appendChild(publicInput);
+
+      Object.entries(files).forEach(([filename, fileContent]) => {
+        const fileInput = document.createElement("textarea");
+        fileInput.setAttribute("name", `file[${filename}]`);
+        fileInput.textContent = fileContent.content;
+        form.appendChild(fileInput);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+
+      showToast("Redirecting to GitHub Gist to create your Gist.", 'info');
+    } catch (error: any) {
+      showToast(`Error preparing Gist: ${error.message}`, 'error');
+      console.error("Gist preparation error:", error);
+    } finally {
+      setIsShareDropdownOpen(false);
+    }
+  };
+
+  const handleShareAsRaw = () => {
+    if (!combinedHtml) {
+      showToast("No content to share.", 'info');
+      return;
+    }
+    navigator.clipboard.writeText(combinedHtml);
+    showToast("Combined HTML, CSS, and JS copied to clipboard!", 'success');
+    setIsShareDropdownOpen(false);
   };
 
   const toggleLayout = () => {
@@ -207,7 +328,7 @@ function App() {
 
   function handleCopy(generatedCode: string, codeType: string): void {
     navigator.clipboard.writeText(generatedCode);
-    alert(`${codeType} code copied to clipboard`);
+    showToast(`${codeType} code copied to clipboard!`, 'success');
   }
 
   const codePanel = (
@@ -338,7 +459,7 @@ function App() {
               <span className="slider"></span>
             </label>
           </div>
-          <div className="history-dropdown">
+          <div className="history-dropdown" ref={historyDropdownRef}>
             <button
               className="dropdown-button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -358,6 +479,21 @@ function App() {
                     </span>
                   </a>
                 ))}
+              </div>
+            )}
+          </div>
+          <div className="share-dropdown" ref={shareDropdownRef}>
+            <button
+              className="dropdown-button"
+              onClick={() => setIsShareDropdownOpen(!isShareDropdownOpen)}
+              disabled={!combinedHtml}
+            >
+              Share
+            </button>
+            {isShareDropdownOpen && (
+              <div className="dropdown-content">
+                <a onClick={handleShareAsGist}>Share as Gist</a>
+                <a onClick={handleShareAsRaw}>Copy Raw HTML/CSS/JS</a>
               </div>
             )}
           </div>
@@ -416,6 +552,7 @@ function App() {
           </button>
         </div>
       </main>
+      <Toaster messages={toastMessages} removeMessage={removeToast} />
     </div>
   );
 }
