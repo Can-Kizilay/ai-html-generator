@@ -30,6 +30,46 @@ function App() {
   const [isInputVisible, setIsInputVisible] = useState(true);
   const lastScrollTop = useRef(0);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [savedComponents, setSavedComponents] = useState<any[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    loadSavedComponents();
+  }, []);
+
+  const loadSavedComponents = () => {
+    try {
+      const storedComponents = localStorage.getItem("generatedHtmlComponents");
+      if (storedComponents) {
+        setSavedComponents(JSON.parse(storedComponents));
+      }
+    } catch (error) {
+      console.error("Failed to load components from local storage", error);
+    }
+  };
+
+  const saveComponent = (component: any) => {
+    setSavedComponents((prevComponents) => {
+      const updatedComponents = [component, ...prevComponents].slice(0, 25);
+      localStorage.setItem(
+        "generatedHtmlComponents",
+        JSON.stringify(updatedComponents)
+      );
+      return updatedComponents;
+    });
+  };
+
+  const handleLoadComponent = (component: any) => {
+    setCombinedHtml(
+      `<style>${component.css}</style>${component.html}<script>${component.js}</script>`
+    );
+    setGeneratedHtml(component.html);
+    setGeneratedCss(component.css);
+    setGeneratedJs(component.js || "");
+    setDescription(component.description || "No description provided.");
+    setIsDropdownOpen(false);
+  };
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
@@ -83,7 +123,9 @@ function App() {
 
       let fullPrompt;
       if (isImprovement) {
-        fullPrompt = `Improve the following HTML, CSS, and JavaScript code based on the description: ${prompt}. 
+        fullPrompt = `Improve the following HTML, CSS, and JavaScript code based on the
+        prompt: ${prompt}.
+        description: ${description}. 
         Current HTML: ${generatedHtml}
         Current CSS: ${generatedCss}
         Current JS: ${generatedJs}
@@ -142,6 +184,14 @@ function App() {
         setGeneratedCss(data.css); // Keep separate for copying
         setGeneratedJs(data.js || ""); // Keep separate for copying
         setDescription(data.description || "No description provided.");
+
+        saveComponent({
+          html: data.html,
+          css: data.css,
+          js: data.js || "",
+          description: data.description || "No description provided.",
+          timestamp: new Date().toISOString(),
+        });
       } else {
         throw new Error(
           "Malformed API response: Missing HTML or CSS content in JSON."
@@ -287,6 +337,29 @@ function App() {
               />
               <span className="slider"></span>
             </label>
+          </div>
+          <div className="history-dropdown">
+            <button
+              className="dropdown-button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={savedComponents.length === 0}
+            >
+              History
+            </button>
+            {isDropdownOpen && savedComponents.length > 0 && (
+              <div className="dropdown-content">
+                {savedComponents.map((comp, index) => (
+                  <a key={index} onClick={() => handleLoadComponent(comp)}>
+                    <span className="dropdown-item-description">
+                      {comp.description || `Component ${index + 1}`}
+                    </span>
+                    <span className="dropdown-item-timestamp">
+                      {new Date(comp.timestamp).toLocaleString()}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </header>
