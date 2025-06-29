@@ -100,6 +100,20 @@ function App() {
     });
   };
 
+  const handleDeleteComponent = (timestamp: string) => {
+    setSavedComponents((prevComponents) => {
+      const updatedComponents = prevComponents.filter(
+        (comp) => comp.timestamp !== timestamp
+      );
+      localStorage.setItem(
+        "generatedHtmlComponents",
+        JSON.stringify(updatedComponents)
+      );
+      return updatedComponents;
+    });
+    showToast("Component deleted from history.", 'info');
+  };
+
   const handleLoadComponent = (component: any) => {
     setCombinedHtml(
       `<style>${component.css}</style>${component.html}<script>${component.js}</script>`
@@ -397,8 +411,13 @@ function App() {
             <SlSkeleton />
           </div>
         )}
-        {combinedHtml && (
-          <HtmlRenderer htmlContent={combinedHtml} theme={theme} />
+        {generatedHtml && (
+          <HtmlRenderer
+            htmlContent={generatedHtml}
+            cssContent={generatedCss}
+            jsContent={generatedJs}
+            theme={theme}
+          />
         )}
       </div>
     </Panel>
@@ -470,14 +489,25 @@ function App() {
             {isDropdownOpen && savedComponents.length > 0 && (
               <div className="dropdown-content">
                 {savedComponents.map((comp, index) => (
-                  <a key={index} onClick={() => handleLoadComponent(comp)}>
-                    <span className="dropdown-item-description">
-                      {comp.description || `Component ${index + 1}`}
-                    </span>
-                    <span className="dropdown-item-timestamp">
-                      {new Date(comp.timestamp).toLocaleString()}
-                    </span>
-                  </a>
+                  <div key={index} className="dropdown-item-wrapper">
+                    <a onClick={() => handleLoadComponent(comp)}>
+                      <span className="dropdown-item-description">
+                        {comp.description || `Component ${index + 1}`}
+                      </span>
+                      <span className="dropdown-item-timestamp">
+                        {new Date(comp.timestamp).toLocaleString()}
+                      </span>
+                    </a>
+                    <button
+                      className="delete-history-item-button"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering handleLoadComponent
+                        handleDeleteComponent(comp.timestamp);
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

@@ -3,10 +3,12 @@ import styles from './HtmlRenderer.module.css';
 
 interface HtmlRendererProps {
   htmlContent: string;
+  cssContent: string;
+  jsContent: string;
   theme: string;
 }
 
-const HtmlRenderer: React.FC<HtmlRendererProps> = ({ htmlContent, theme }) => {
+const HtmlRenderer: React.FC<HtmlRendererProps> = ({ htmlContent, cssContent, jsContent, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,18 +44,43 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ htmlContent, theme }) => {
       containerRef.current.setAttribute('data-theme', theme);
     }
 
-    // Append and execute scripts
+    // Inject CSS content
+    if (cssContent) {
+      const styleTag = document.createElement('style');
+      styleTag.setAttribute('data-injected-css', 'true'); // Mark for cleanup
+      styleTag.textContent = cssContent;
+      containerRef.current?.appendChild(styleTag);
+    }
+
+    // Append and execute scripts from htmlContent
     scripts.forEach(script => {
       containerRef.current?.appendChild(script);
     });
+
+    // Inject JS content
+    if (jsContent) {
+      const scriptTag = document.createElement('script');
+      scriptTag.setAttribute('data-injected-js', 'true'); // Mark for cleanup
+      scriptTag.textContent = jsContent;
+      containerRef.current?.appendChild(scriptTag);
+    }
 
     // Cleanup function: remove dynamically added scripts when component unmounts or htmlContent changes
     return () => {
       scripts.forEach(script => {
         script.remove();
       });
+      // Clean up dynamically added style and script tags
+      const styleTag = containerRef.current?.querySelector('style[data-injected-css]');
+      if (styleTag) {
+        styleTag.remove();
+      }
+      const jsTag = containerRef.current?.querySelector('script[data-injected-js]');
+      if (jsTag) {
+        jsTag.remove();
+      }
     };
-  }, [htmlContent, theme]); // Re-run effect when htmlContent or theme changes
+  }, [htmlContent, cssContent, jsContent, theme]); // Re-run effect when htmlContent, cssContent, jsContent or theme changes
 
   return (
     <div className={styles.container} ref={containerRef} data-theme={theme} />

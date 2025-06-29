@@ -1,4 +1,11 @@
 /* HtmlRenderer.module.css */
+.wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 200px; /* Ensure wrapper has a minimum height */
+  height: auto;
+}
+
 .container {
   padding: 20px;
   border: 1px solid var(--output-border-color);
@@ -25,4 +32,34 @@
   background-color: yellow;
   font-weight: bold;
   color: #000;
+}
+
+.fullScreenButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #007bff; /* Bright blue for visibility */
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 1000; /* Ensure button is above content */
+}
+
+.fullScreenButton:hover {
+  background-color: #0056b3;
+}
+
+.fullScreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 20px !important;
+  border-radius: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  background-color: var(--output-background) !important; /* Ensure background covers full screen */
+  overflow: auto !important;
+  box-sizing: border-box !important;
 }
