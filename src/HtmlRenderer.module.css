@@ -1,0 +1,28 @@
+/* HtmlRenderer.module.css */
+.container {
+  padding: 20px;
+  border: 1px solid var(--output-border-color);
+  border-radius: 8px;
+  background-color: var(--output-background);
+  color: var(--text-color);
+  overflow: auto;
+  height: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.container h1 {
+  color: var(--text-color);
+  font-size: 2em;
+}
+
+.container p {
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.container .highlight {
+  background-color: yellow;
+  font-weight: bold;
+  color: #000;
+}
