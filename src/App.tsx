@@ -501,10 +501,10 @@ function App() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M3 3v5a2 2 0 0 0 2 2h5"></path>
-                <path d="M3 12v5a2 2 0 0 0 2 2h5"></path>
-                <path d="M12 3v5a2 2 0 0 0 2 2h5"></path>
-                <path d="M12 12v5a2 2 0 0 0 2 2h5"></path>
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+                <path d="M21.5 16.5l-2.5 2.5l-2.5-2.5"></path>
+                <path d="M21.5 16.5l-2.5-2.5l-2.5 2.5"></path>
               </svg>
             </button>
             {isDropdownOpen && savedComponents.length > 0 && (
