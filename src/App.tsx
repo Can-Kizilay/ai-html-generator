@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import Toaster from "./Toaster";
+import { v4 as uuidv4 } from 'uuid';
 import "./App.css";
 import HtmlRenderer from "./HtmlRenderer";
 import { GoogleGenAI } from "@google/genai";
@@ -24,15 +26,188 @@ function App() {
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [theme, setTheme] = useState("light");
-  const [layout, setLayout] = useState<"horizontal" | "vertical">("horizontal");
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [layout, setLayout] = useState<"horizontal" | "vertical">(() => localStorage.getItem('layout') as "horizontal" | "vertical" || 'horizontal');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isInputVisible, setIsInputVisible] = useState(true);
   const lastScrollTop = useRef(0);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [savedComponents, setSavedComponents] = useState<any[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const [toastMessages, setToastMessages] = useState<any[]>([]);
+
+  const historyDropdownRef = useRef<HTMLDivElement>(null);
+  const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = uuidv4();
+    setToastMessages((prevMessages) => [...prevMessages, { id, message, type }]);
+    setTimeout(() => {
+      removeToast(id);
+    }, 3000); // Toast disappears after 3 seconds
+  };
+
+  const removeToast = (id: string) => {
+    setToastMessages((prevMessages) =>
+      prevMessages.filter((msg) => msg.id !== id)
+    );
+  };
+
+  useEffect(() => {
+    loadSavedComponents();
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        historyDropdownRef.current &&
+        !historyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+      if (
+        shareDropdownRef.current &&
+        !shareDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsShareDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const loadSavedComponents = () => {
+    try {
+      const storedComponents = localStorage.getItem("generatedHtmlComponents");
+      if (storedComponents) {
+        setSavedComponents(JSON.parse(storedComponents));
+      }
+    } catch (error) {
+      console.error("Failed to load components from local storage", error);
+    }
+  };
+
+  const saveComponent = (component: any) => {
+    setSavedComponents((prevComponents) => {
+      const updatedComponents = [component, ...prevComponents].slice(0, 25);
+      localStorage.setItem(
+        "generatedHtmlComponents",
+        JSON.stringify(updatedComponents)
+      );
+      return updatedComponents;
+    });
+  };
+
+  const handleDeleteComponent = (timestamp: string) => {
+    setSavedComponents((prevComponents) => {
+      const updatedComponents = prevComponents.filter(
+        (comp) => comp.timestamp !== timestamp
+      );
+      localStorage.setItem(
+        "generatedHtmlComponents",
+        JSON.stringify(updatedComponents)
+      );
+      return updatedComponents;
+    });
+    showToast("Component deleted from history.", 'info');
+  };
+
+  const handleLoadComponent = (component: any) => {
+    setCombinedHtml(
+      `<style>${component.css}</style>${component.html}<script>${component.js}</script>`
+    );
+    setGeneratedHtml(component.html);
+    setGeneratedCss(component.css);
+    setGeneratedJs(component.js || "");
+    setDescription(component.description || "No description provided.");
+    setIsDropdownOpen(false);
+  };
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
+  };
+
+  const handleShareAsGist = async () => {
+    if (!generatedHtml && !generatedCss && !generatedJs) {
+      showToast("No content to share.", 'info');
+      return;
+    }
+
+    const gistContent = {
+      description: description || "Generated HTML Component",
+      public: true,
+      files: {
+        "index.html": {
+          content: generatedHtml,
+        },
+        "style.css": {
+          content: generatedCss,
+        },
+        "script.js": {
+          content: generatedJs,
+        },
+      },
+    };
+
+    try {
+      const files: { [key: string]: { content: string } } = {};
+      if (generatedHtml) {
+        files["index.html"] = { content: generatedHtml };
+      }
+      if (generatedCss) {
+        files["style.css"] = { content: generatedCss };
+      }
+      if (generatedJs) {
+        files["script.js"] = { content: generatedJs };
+      }
+
+      const form = document.createElement("form");
+      form.setAttribute("method", "POST");
+      form.setAttribute("action", "https://gist.github.com/");
+      form.setAttribute("target", "_blank");
+
+      const descriptionInput = document.createElement("input");
+      descriptionInput.setAttribute("type", "hidden");
+      descriptionInput.setAttribute("name", "description");
+      descriptionInput.setAttribute("value", description || "Generated HTML Component");
+      form.appendChild(descriptionInput);
+
+      const publicInput = document.createElement("input");
+      publicInput.setAttribute("type", "hidden");
+      publicInput.setAttribute("name", "public");
+      publicInput.setAttribute("value", "true");
+      form.appendChild(publicInput);
+
+      Object.entries(files).forEach(([filename, fileContent]) => {
+        const fileInput = document.createElement("textarea");
+        fileInput.setAttribute("name", `file[${filename}]`);
+        fileInput.textContent = fileContent.content;
+        form.appendChild(fileInput);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+
+      showToast("Redirecting to GitHub Gist to create your Gist.", 'info');
+    } catch (error: any) {
+      showToast(`Error preparing Gist: ${error.message}`, 'error');
+      console.error("Gist preparation error:", error);
+    } finally {
+      setIsShareDropdownOpen(false);
+    }
+  };
+
+  const handleShareAsRaw = () => {
+    if (!combinedHtml) {
+      showToast("No content to share.", 'info');
+      return;
+    }
+    navigator.clipboard.writeText(combinedHtml);
+    showToast("Combined HTML, CSS, and JS copied to clipboard!", 'success');
+    setIsShareDropdownOpen(false);
   };
 
   const toggleLayout = () => {
@@ -41,7 +216,12 @@ function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('layout', layout);
+  }, [layout]);
 
   const handleScroll = (event: React.UIEvent<HTMLElement>) => {
     const { scrollTop } = event.currentTarget;
@@ -83,7 +263,9 @@ function App() {
 
       let fullPrompt;
       if (isImprovement) {
-        fullPrompt = `Improve the following HTML, CSS, and JavaScript code based on the description: ${prompt}. 
+        fullPrompt = `Improve the following HTML, CSS, and JavaScript code based on the
+        prompt: ${prompt}.
+        description: ${description}. 
         Current HTML: ${generatedHtml}
         Current CSS: ${generatedCss}
         Current JS: ${generatedJs}
@@ -142,6 +324,14 @@ function App() {
         setGeneratedCss(data.css); // Keep separate for copying
         setGeneratedJs(data.js || ""); // Keep separate for copying
         setDescription(data.description || "No description provided.");
+
+        saveComponent({
+          html: data.html,
+          css: data.css,
+          js: data.js || "",
+          description: data.description || "No description provided.",
+          timestamp: new Date().toISOString(),
+        });
       } else {
         throw new Error(
           "Malformed API response: Missing HTML or CSS content in JSON."
@@ -157,7 +347,7 @@ function App() {
 
   function handleCopy(generatedCode: string, codeType: string): void {
     navigator.clipboard.writeText(generatedCode);
-    alert(`${codeType} code copied to clipboard`);
+    showToast(`${codeType} code copied to clipboard!`, 'success');
   }
 
   const codePanel = (
@@ -226,8 +416,13 @@ function App() {
             <SlSkeleton />
           </div>
         )}
-        {combinedHtml && (
-          <HtmlRenderer htmlContent={combinedHtml} theme={theme} />
+        {generatedHtml && (
+          <HtmlRenderer
+            htmlContent={generatedHtml}
+            cssContent={generatedCss}
+            jsContent={generatedJs}
+            theme={theme}
+          />
         )}
       </div>
     </Panel>
@@ -288,6 +483,86 @@ function App() {
               <span className="slider"></span>
             </label>
           </div>
+          <div className="history-dropdown" ref={historyDropdownRef}>
+            <button
+              className="dropdown-button icon-button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              disabled={savedComponents.length === 0}
+              aria-label="History"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 3v5a2 2 0 0 0 2 2h5"></path>
+                <path d="M3 12v5a2 2 0 0 0 2 2h5"></path>
+                <path d="M12 3v5a2 2 0 0 0 2 2h5"></path>
+                <path d="M12 12v5a2 2 0 0 0 2 2h5"></path>
+              </svg>
+            </button>
+            {isDropdownOpen && savedComponents.length > 0 && (
+              <div className="dropdown-content">
+                {savedComponents.map((comp, index) => (
+                  <div key={index} className="dropdown-item-wrapper">
+                    <a onClick={() => handleLoadComponent(comp)}>
+                      <span className="dropdown-item-description">
+                        {comp.description || `Component ${index + 1}`}
+                      </span>
+                      <span className="dropdown-item-timestamp">
+                        {new Date(comp.timestamp).toLocaleString()}
+                      </span>
+                    </a>
+                    <button
+                      className="delete-history-item-button"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering handleLoadComponent
+                        handleDeleteComponent(comp.timestamp);
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="share-dropdown" ref={shareDropdownRef}>
+            <button
+              className="dropdown-button icon-button"
+              onClick={() => setIsShareDropdownOpen(!isShareDropdownOpen)}
+              disabled={!combinedHtml}
+              aria-label="Share"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                <polyline points="16 6 12 2 8 6"></polyline>
+                <line x1="12" y1="2" x2="12" y2="15"></line>
+              </svg>
+            </button>
+            {isShareDropdownOpen && (
+              <div className="dropdown-content">
+                <a onClick={handleShareAsGist}>Share as Gist</a>
+                <a onClick={handleShareAsRaw}>Copy Raw HTML/CSS/JS</a>
+              </div>
+            )}
+          </div>
         </div>
       </header>
       <main
@@ -343,6 +618,7 @@ function App() {
           </button>
         </div>
       </main>
+      <Toaster messages={toastMessages} removeMessage={removeToast} />
     </div>
   );
 }
